@@ -9,6 +9,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -17,19 +18,29 @@ import java.time.LocalDate;
 import java.util.List;
 import java.util.Optional;
 
+/** Exposes HTTP endpoints for books, members, and borrowing records. */
 @RestController
 @RequestMapping("/api")
 public class LibraryController {
 
-    // Create a logger instance
+    /** Logs API actions and returned resource details. */
     private static final Logger logger = LoggerFactory.getLogger(LibraryController.class);
 
+    /** Provides the in-memory operations used by the API endpoints. */
     @Autowired
     private LibraryService libraryService;
 
-    // ==================== Book Endpoints ====================
+    /** Configured description returned by {@code GET /api/description}. */
+    @Value("${app.description}")
+    private String appDescription;
 
-    // Get all books
+    /** Returns the description configured for this application. */
+    @GetMapping ("/description")
+    public String getDescription() {
+        return appDescription;
+    }
+
+    /** Lists all books in insertion order. */
     @GetMapping("/books")
     public ResponseEntity<List<Book>> getAllBooks() {
         List<Book> books = libraryService.getAllBooks();
@@ -37,7 +48,7 @@ public class LibraryController {
         return new ResponseEntity<>(books, HttpStatus.OK);
     }
 
-    // Get a book by ID
+    /** Finds a book by ID, returning 404 when it does not exist. */
     @GetMapping("/books/{id}")
     public ResponseEntity<Book> getBookById(@PathVariable Long id) {
         Optional<Book> book = libraryService.getBookById(id);
@@ -46,7 +57,7 @@ public class LibraryController {
                 .orElseGet(() -> new ResponseEntity<>(HttpStatus.NOT_FOUND));
     }
 
-    // Get a book by title
+    /** Finds the first book with a matching title, returning 404 when absent. */
     @GetMapping("/books/title/{title}")
     public ResponseEntity<Book> getBookByTitle(@PathVariable String title) {
         Optional<Book> book = libraryService.getBookByTitle(title);
@@ -56,7 +67,7 @@ public class LibraryController {
                 .orElseGet(() -> new ResponseEntity<>(HttpStatus.NOT_FOUND));
     }
 
-    // Get a book by author
+    /** Finds the first book with a matching author, returning 404 when absent. */
     @GetMapping("/books/author/{author}")
     public ResponseEntity<Book> getBookByAuthor(@PathVariable String author) {
         Optional<Book> book = libraryService.getBookByAuthor(author);
@@ -65,7 +76,7 @@ public class LibraryController {
                 .orElseGet(() -> new ResponseEntity<>(HttpStatus.NOT_FOUND));
     }
 
-    // Add a new book
+    /** Stores a book supplied in the request body and returns 201 Created. */
     @PostMapping("/books")
     public ResponseEntity<Book> addBook(@RequestBody Book book) {
         libraryService.addBook(book);
@@ -73,7 +84,7 @@ public class LibraryController {
         return new ResponseEntity<>(book, HttpStatus.CREATED);
     }
 
-    // Update a book
+    /** Replaces an existing book's fields, using the path ID as its identifier. */
     @PutMapping("/books/{id}")
     public ResponseEntity<Book> updateBook(@PathVariable Long id, @RequestBody Book updatedBook) {
         if (!libraryService.getBookById(id).isPresent()) {
@@ -85,7 +96,7 @@ public class LibraryController {
         return new ResponseEntity<>(updatedBook, HttpStatus.OK);
     }
 
-    // Delete a book
+    /** Deletes a book by ID and returns 204 when successful. */
     @DeleteMapping("/books/{id}")
     public ResponseEntity<Void> deleteBook(@PathVariable Long id) {
         if (!libraryService.getBookById(id).isPresent()) {
@@ -96,9 +107,7 @@ public class LibraryController {
         return new ResponseEntity<>(HttpStatus.NO_CONTENT);
     }
 
-    // ==================== Member Endpoints ====================
-
-    // Get all members
+    /** Lists all registered members in insertion order. */
     @GetMapping("/members")
     public ResponseEntity<List<Member>> getAllMembers() {
         List<Member> members = libraryService.getAllMembers();
@@ -106,7 +115,7 @@ public class LibraryController {
         return new ResponseEntity<>(members, HttpStatus.OK);
     }
 
-    // Get a member by ID
+    /** Finds a member by ID, returning 404 when it does not exist. */
     @GetMapping("/members/{id}")
     public ResponseEntity<Member> getMemberById(@PathVariable Long id) {
         Optional<Member> member = libraryService.getMemberById(id);
@@ -115,7 +124,7 @@ public class LibraryController {
                 .orElseGet(() -> new ResponseEntity<>(HttpStatus.NOT_FOUND));
     }
 
-    // Add a new member
+    /** Stores a member supplied in the request body and returns 201 Created. */
     @PostMapping("/members")
     public ResponseEntity<Member> addMember(@RequestBody Member member) {
         libraryService.addMember(member);
@@ -123,7 +132,7 @@ public class LibraryController {
         return new ResponseEntity<>(member, HttpStatus.CREATED);
     }
 
-    // Update a member
+    /** Replaces an existing member's fields, using the path ID as its identifier. */
     @PutMapping("/members/{id}")
     public ResponseEntity<Member> updateMember(@PathVariable Long id, @RequestBody Member updatedMember) {
         if (!libraryService.getMemberById(id).isPresent()) {
@@ -135,7 +144,7 @@ public class LibraryController {
         return new ResponseEntity<>(updatedMember, HttpStatus.OK);
     }
 
-    // Delete a member
+    /** Deletes a member by ID and returns 204 when successful. */
     @DeleteMapping("/members/{id}")
     public ResponseEntity<Void> deleteMember(@PathVariable Long id) {
         if (!libraryService.getMemberById(id).isPresent()) {
@@ -146,9 +155,7 @@ public class LibraryController {
         return new ResponseEntity<>(HttpStatus.NO_CONTENT);
     }
 
-    // ==================== BorrowingRecord Endpoints ====================
-
-    // Get all borrowing records
+    /** Lists all borrowing records in insertion order. */
     @GetMapping("/borrowing-records")
     public ResponseEntity<List<BorrowingRecord>> getAllBorrowingRecords() {
         List<BorrowingRecord> records = libraryService.getAllBorrowingRecords();
@@ -156,18 +163,15 @@ public class LibraryController {
         return new ResponseEntity<>(records, HttpStatus.OK);
     }
 
-    // Borrow a book
+    /** Creates a borrowing record; the service sets the borrow and due dates. */
     @PostMapping("/borrow")
     public ResponseEntity<BorrowingRecord> borrowBook(@RequestBody BorrowingRecord record) {
-        // Set borrow date and due date (e.g., due date = borrow date + 14 days)
-        record.setBorrowDate(LocalDate.now());
-        record.setDueDate(LocalDate.now().plusDays(14));
         libraryService.borrowBook(record);
         logger.info("The book has been borrowed "+record);
         return new ResponseEntity<>(record, HttpStatus.CREATED);
     }
 
-    // Return a book
+    /** Marks a borrowing record as returned on the current date. */
     @PutMapping("/return/{recordId}")
     public ResponseEntity<Void> returnBook(@PathVariable Long recordId) {
         libraryService.returnBook(recordId, LocalDate.now());
