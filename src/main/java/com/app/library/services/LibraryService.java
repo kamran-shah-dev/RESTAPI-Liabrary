@@ -1,153 +1,178 @@
 package com.app.library.services;
 
 import com.app.library.model.Book;
-import com.app.library.model.Member;
 import com.app.library.model.BorrowingRecord;
+import com.app.library.model.Member;
+import org.springframework.stereotype.Service;
 
 import java.time.LocalDate;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 
-import org.springframework.stereotype.Service;
-
+/** Provides in-memory operations for books, members, and borrowing records. */
 @Service
 public class LibraryService {
 
-    // public static void main(String[] args) {
-    //     LibraryService libraryService = new LibraryService();
+    /** Stores books by ID and preserves insertion order for API responses. */
+    private final Map<Long, Book> books = new LinkedHashMap<>();
+    /** Stores members by ID and preserves insertion order for API responses. */
+    private final Map<Long, Member> members = new LinkedHashMap<>();
+    /** Stores borrowing records by ID and preserves insertion order. */
+    private final Map<Long, BorrowingRecord> borrowingRecords = new LinkedHashMap<>();
 
-    //     libraryService.addBook(new Book("The Hobbit", "J.R.R. Tolkien", 1937, "Fantasy", 5));
-    //     libraryService.addBook(new Book("Pride and Prejudice", "Jane Austen", 1813, "Romance", 3));
-
-    //     System.out.println("Book found by title:");
-    //     System.out.println(libraryService.getBookByTitle("TheHobbit").orElse(null));
-
-    //     System.out.println("Book found by author:");
-    //     System.out.println(libraryService.getBookByAuthor("Jane Austen").orElse(null));
-    // }
-
-    // In-memory storage using ArrayList
-    private List<Book> books = new ArrayList<>();
-    private List<Member> members = new ArrayList<>();
-    private List<BorrowingRecord> borrowingRecords = new ArrayList<>();
-
-    // ==================== Book Methods ====================
-
-    // Get all books
+    /** Returns all books as a snapshot list. */
     public List<Book> getAllBooks() {
-        return books;
+        return new ArrayList<>(books.values());
     }
 
-    // Get a book by ID
+    /** Finds a book by its ID. */
     public Optional<Book> getBookById(Long id) {
-        return books.stream()
-                .filter(book -> book.getId().equals(id))
-                .findFirst();
+        return Optional.ofNullable(books.get(id));
     }
 
-    // Get a book by Title
+    /** Finds the first title match, ignoring whitespace and letter case. */
     public Optional<Book> getBookByTitle(String title) {
-        return books.stream()
-                .filter(book -> book.getTitle().replaceAll("\\s+", "").equalsIgnoreCase(title))
+        String normalizedTitle = normalize(title);
+        return books.values().stream()
+                .filter(book -> normalize(book.getTitle()).equals(normalizedTitle))
                 .findFirst();
     }
 
-    // Get a book by author
+    /** Finds the first author match, ignoring whitespace and letter case. */
     public Optional<Book> getBookByAuthor(String author) {
-        return books.stream()
-                .filter(book -> book.getAuthor().replaceAll("\\s+", "").equalsIgnoreCase(author))
+        String normalizedAuthor = normalize(author);
+        return books.values().stream()
+                .filter(book -> normalize(book.getAuthor()).equals(normalizedAuthor))
                 .findFirst();
     }
 
-    // Add a new book
+    /** Finds the books filtered by genre, ignoring whitespace and letter case. */
+    public List<Book> getBookByGenre(String genre) {
+        String normalizedGenre = normalize(genre);
+        return books.values().stream()
+                .filter(book -> book.getGenre().equals(normalizedGenre))
+                .toList();
+    }
+
+    /** Normalizes a search value for title and author comparisons. */
+    private String normalize(String value) {
+        return value == null ? "" : value.replaceAll("\\s+", "").toLowerCase();
+    }
+
+    /** Returns books whose active borrowing records are due on the given date. */
+    public List<Book> getDueBooks(LocalDate date) {
+        return borrowingRecords.values().stream()
+                .filter(record -> date != null && date.equals(record.getDueDate())
+                        && record.getReturnDate() == null)
+                .map(BorrowingRecord::getBook)
+                .toList();
+    }
+
+    /** Returns today if a copy is available, otherwise the earliest active loan due date.
+     * Returns {@code null} if the book or an active loan due date is unavailable.
+     */
+    public LocalDate getEarliestAvailableBook(Long id) {
+        Book book = books.get(id);
+        if (book == null) {
+            return null;
+        }
+        if (book.getAvailableCopies() > 0) {
+            return LocalDate.now();
+        }
+        return borrowingRecords.values().stream()
+                .filter(record -> record.getBook() != null
+                    && id.equals(record.getBook().getId())
+                    && record.getReturnDate() == null)
+                .map(BorrowingRecord::getDueDate)
+                .filter(date -> date != null)
+                .min(LocalDate::compareTo)
+                .orElse(null);
+    }
+
+    /** Adds or replaces a book using its ID as the map key. */
     public void addBook(Book book) {
-        books.add(book);
+        books.put(book.getId(), book);
     }
 
-    // Update a book
+    /** Replaces a book if the ID already exists. */
     public void updateBook(Book updatedBook) {
-        for (int i = 0; i < books.size(); i++) {
-            Book book = books.get(i);
-            if (book.getId().equals(updatedBook.getId())) {
-                books.set(i, updatedBook);
-                break;
-            }
+        if (books.containsKey(updatedBook.getId())) {
+            books.put(updatedBook.getId(), updatedBook);
         }
     }
 
-    // Delete a book by ID
+    /** Removes the book with the given ID, if present. */
     public void deleteBook(Long id) {
-        books.removeIf(book -> book.getId().equals(id));
+        books.remove(id);
     }
 
-    // ==================== Member Methods ====================
-
-    // Get all members
+    /** Returns all members as a snapshot list. */
     public List<Member> getAllMembers() {
-        return members;
+        return new ArrayList<>(members.values());
     }
 
-    // Get a member by ID
+    /** Finds a member by its ID. */
     public Optional<Member> getMemberById(Long id) {
-        return members.stream()
-                .filter(member -> member.getId().equals(id))
-                .findFirst();
+        return Optional.ofNullable(members.get(id));
     }
 
-    // Add a new member
+    /** Adds or replaces a member using its ID as the map key. */
     public void addMember(Member member) {
-        members.add(member);
+        members.put(member.getId(), member);
     }
 
-    // Update a member
+    /** Replaces a member if the ID already exists. */
     public void updateMember(Member updatedMember) {
-        for (int i = 0; i < members.size(); i++) {
-            Member member = members.get(i);
-            if (member.getId().equals(updatedMember.getId())) {
-                members.set(i, updatedMember);
-                break;
-            }
+        if (members.containsKey(updatedMember.getId())) {
+            members.put(updatedMember.getId(), updatedMember);
         }
     }
 
-    // Delete a member by ID
+    /** Removes the member with the given ID, if present. */
     public void deleteMember(Long id) {
-        members.removeIf(member -> member.getId().equals(id));
+        members.remove(id);
     }
 
-    // ==================== BorrowingRecord Methods ====================
-
-    // Get all borrowing records
+    /** Returns all borrowing records as a snapshot list. */
     public List<BorrowingRecord> getAllBorrowingRecords() {
-        return borrowingRecords;
+        return new ArrayList<>(borrowingRecords.values());
     }
 
-    // Borrow a book (create a new borrowing record)
+    /** Validates and records a two-week loan, then decrements the book's available copies. */
     public void borrowBook(BorrowingRecord record) {
-        // Set borrow date and due date (e.g., due date = borrow date + 14 days)
+        Book requestedBook = record.getBook();
+        Member requestedMember = record.getMember();
+        Book book = requestedBook == null ? null : books.get(requestedBook.getId());
+        Member member = requestedMember == null ? null : members.get(requestedMember.getId());
+
+        if (borrowingRecords.containsKey(record.getId())) {
+            throw new IllegalArgumentException("A borrowing record with this ID already exists");
+        }
+        if (book == null || member == null) {
+            throw new IllegalArgumentException("The book and member must already exist in the library");
+        }
+        if (book.getAvailableCopies() <= 0) {
+            throw new IllegalStateException("No copies of this book are currently available");
+        }
+
+        record.setBook(book);
+        record.setMember(member);
         record.setBorrowDate(LocalDate.now());
         record.setDueDate(LocalDate.now().plusDays(14));
-        borrowingRecords.add(record);
-
-        // Decrease the available copies of the book
-        Book book = record.getBook();
+        borrowingRecords.put(record.getId(), record);
         book.setAvailableCopies(book.getAvailableCopies() - 1);
     }
 
-    // Return a book (update the borrowing record with the return date)
+    /** Marks an active loan returned and restores a copy; ignores unknown or already returned IDs. */
     public void returnBook(Long recordId, LocalDate returnDate) {
-        for (BorrowingRecord record : borrowingRecords) {
-            if (record.getId().equals(recordId)) {
-                record.setReturnDate(returnDate);
-
-                // Increase the available copies of the book
-                Book book = record.getBook();
-                book.setAvailableCopies(book.getAvailableCopies() + 1);
-                break;
-            }
+        BorrowingRecord record = borrowingRecords.get(recordId);
+        if (record != null && record.getReturnDate() == null) {
+            record.setReturnDate(returnDate);
+            record.getBook().setAvailableCopies(record.getBook().getAvailableCopies() + 1);
         }
     }
-    
 }
 
