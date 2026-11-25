@@ -76,6 +76,30 @@ public class LibraryController {
                 .orElseGet(() -> new ResponseEntity<>(HttpStatus.NOT_FOUND));
     }
 
+    /** Get all books of a specific genere, if no books found retur 404 */
+    @GetMapping("/books/genere/{genere}")
+    public ResponseEntity<List<Book>> getBookByGenere(@PathVariable String genere) {
+        List<Book> books = libraryService.getBookByGenre(genere);
+        logger.info("The book returned"+books);
+        return books.isEmpty()? new ResponseEntity<>(HttpStatus.NOT_FOUND) : new ResponseEntity<>(books, HttpStatus.OK);
+    }
+
+    /** Get the earliest available book*/
+    @GetMapping("/books/earliestavailable/{id}")
+    public ResponseEntity<LocalDate> getEarliestAvailableBook(@PathVariable Long id) {
+        LocalDate date = libraryService.getEarliestAvailableBook(id);
+        logger.info("The book returned"+date);
+        return date == null? new ResponseEntity<>(HttpStatus.NOT_FOUND) : new ResponseEntity<>(date, HttpStatus.OK);
+    }
+
+    /** Get all due books */
+    @GetMapping("/books/duebooks/{date}")
+    public ResponseEntity<List<Book>> getBookByGenere(@PathVariable LocalDate date) {
+        List<Book> books = libraryService.getDueBooks(date);
+        logger.info("The book returned"+books);
+        return books.isEmpty()? new ResponseEntity<>(HttpStatus.NOT_FOUND) : new ResponseEntity<>(books, HttpStatus.OK);
+    }
+
     /** Stores a book supplied in the request body and returns 201 Created. */
     @PostMapping("/books")
     public ResponseEntity<Book> addBook(@RequestBody Book book) {
